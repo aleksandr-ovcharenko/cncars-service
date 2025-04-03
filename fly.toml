@@ -4,7 +4,7 @@ app = "cncars-service-bot"
 builder = "paketobuildpacks/builder:base"
 
 [env]
-TOKEN = "7549988426:AAGZj8Jt9QWt1HeJhcCp5VgjP-XBCKtHQIc"  # Можно также через переменные Fly.io
+TOKEN = "7549988426:AAGZj8Jt9QWt1HeJhcCp5VgjP-XBCKtHQIc"
 
 [http_service]
 internal_port = 8080
