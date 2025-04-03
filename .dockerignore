@@ -1,3 +1,3 @@
-.env
+configs/.env
 __pycache__/
 venv/

@@ -8,7 +8,7 @@ class Config(BaseSettings):
 
     class Config:
         # Указываем абсолютный путь к .env относительно расположения config.py
-        env_file = Path(__file__).parent.parent / '.env'
+        env_file = Path(__file__).parent / '.env'
         env_file_encoding = 'utf-8'
 
 
