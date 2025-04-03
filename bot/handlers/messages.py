@@ -12,7 +12,20 @@ async def handle_car_info(message: types.Message):
     if not parsed_data:
         await message.answer(
             "❌ Ошибка формата. Пример:\n"
-            "<i>BMW X5 2022, 3.0 л, 249 л.с., 50000$, 30000 км</i>",
+            "<i>BMW X5, 2022г, 3.0 л, 249 л.с., 50000$, 30000 км</i>",
+            parse_mode="HTML"
+        )
+        return
+
+    # Проверка наличия всех обязательных полей
+    required_fields = ['price', 'engine', 'power', 'year']
+    missing_fields = [field for field in required_fields if field not in parsed_data]
+
+    if missing_fields:
+        await message.answer(
+            f"❌ Не хватает данных: {', '.join(missing_fields)}\n"
+            "Пример корректного формата:\n"
+            "<i>BMW X5, 2022г, 3.0 л, 249 л.с., 50000$, 30000 км</i>",
             parse_mode="HTML"
         )
         return
