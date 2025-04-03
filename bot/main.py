@@ -1,20 +1,13 @@
 import asyncio
-import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from bot.handlers import commands, messages
-from configs.config import load_config
 
 
 async def main():
-    try:
-        config = load_config()
-    except Exception as e:
-        logging.critical(f"Ошибка загрузки конфига: {e}")
-        raise
-    bot = Bot(token=config.TG_BOT_TOKEN)  # Используем токен из конфига
+    bot = Bot(token="7549988426:AAGZj8Jt9QWt1HeJhcCp5VgjP-XBCKtHQIc")  # Используем токен из конфига
     dp = Dispatcher(storage=MemoryStorage())
 
     dp.include_router(commands.router)
