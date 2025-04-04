@@ -65,8 +65,6 @@ async def handle_car_info(message: types.Message):
             await message.answer(f"❌ Некорректные значения для: {', '.join(invalid_fields)}")
             return
 
-        logging.info(f"Парсинг успешен: {parsed_data}")
-
         # Расчет таможни
         try:
             result = calculate_customs(
@@ -87,6 +85,9 @@ async def handle_car_info(message: types.Message):
                 market_data = await price_service.get_market_prices(
                     brand=parsed_data.get('brand', ''),
                     model=parsed_data.get('model', ''),
+                    engine=parsed_data['engine'],
+                    power=parsed_data['power'],
+                    mileage=parsed_data['mileage'],
                     year=parsed_data['year']
                 )
             logging.info(f"Результаты парсинга цен: {market_data}")
@@ -118,15 +119,16 @@ async def handle_car_info(message: types.Message):
             response.append("\n⚠️ Не удалось рассчитать таможню")
 
         # Получение рыночных цен
-        market_data = {}
         try:
             async with PriceService() as price_service:
                 market_data = await price_service.get_market_prices(
                     brand=parsed_data.get('brand', ''),
                     model=parsed_data.get('model', ''),
+                    engine=parsed_data['engine'],
+                    power=parsed_data['power'],
+                    mileage=parsed_data['mileage'],
                     year=parsed_data['year']
                 )
-            logging.info(f"Результаты парсинга цен: {market_data}")
 
             if market_data and isinstance(market_data, dict):
                 # Получаем цены напрямую из корня market_data, а не из price_stats
@@ -146,11 +148,26 @@ async def handle_car_info(message: types.Message):
                     f"• Заголовок: {market_data.get('page_title', 'N/A')}"
                 ])
 
+                logging.info(f"Результаты парсинга цен: {market_data.get('listings')}")
+
+                if market_data.get('listings'):
+                    response.append("\n🔍 <b>Последние объявления:</b>")
+                    for idx, item in enumerate(market_data['listings'][:5], 1):
+                        # Проверяем, есть ли все обязательные данные и не равны ли они нулю
+                        price = item.get('price')
+                        mileage = item.get('mileage')
+                        year = item.get('year')
+
+                        if price and mileage and year:
+                            # Форматируем цену и пробег с разделителями тысяч
+                            formatted_price = f"{price:,}".replace(',', ' ') + " ₽"
+
+                            response.append(f"   {formatted_price} | {year} г. | {mileage} км.")
+
         except Exception as e:
             logging.error(f"Ошибка при получении рыночных цен: {str(e)}", exc_info=True)
 
         await message.answer("\n".join(response), parse_mode="HTML", disable_web_page_preview=True)
-        logging.info("Сообщение успешно отправлено")
 
     except Exception as e:
         logging.critical(f"Непредвиденная ошибка: {str(e)}", exc_info=True)

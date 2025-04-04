@@ -15,7 +15,7 @@ setup_logging()
 
 
 class DromDetailedParser:
-    BASE_URL = "https://auto.drom.ru"  # Основной домен
+    BASE_URL = "https://moscow.drom.ru"  # Основной домен
     REGIONAL_URLS = {
         'spb': 'https://spb.drom.ru',
         'msk': 'https://moskva.drom.ru',
@@ -24,7 +24,6 @@ class DromDetailedParser:
     def __init__(self, session: aiohttp.ClientSession, region: str = None):
         self.session = session
         self.base_url = self.REGIONAL_URLS.get(region, self.BASE_URL)
-        logging.info(f"Инициализирован парсер Drom для региона: {region or 'общий'}")
 
     async def get_prices(self, car_data: Dict) -> Optional[Dict]:
         """Получение цен с расширенными параметрами"""
@@ -63,34 +62,48 @@ class DromDetailedParser:
             return None
 
     def build_url_params(self, car_data: Dict) -> str:
-        """Формирование полного набора параметров URL"""
+        """Формирование полного URL с учетом всех параметров авто"""
         params = {
             'order': 'price',
             'unsold': '1',
             'minyear': car_data.get('year', datetime.now().year) - 1,
             'maxyear': car_data.get('year', datetime.now().year) + 1,
         }
+        logging.info(f"car_data: {car_data}")
 
-        # Добавляем параметры, если они есть в car_data
-        optional_params = {
-            'engine': ('mv', 'xv', 0.3),
-            'power': ('minpower', 'maxpower', 30),
-            'mileage': ('minprobeg', 'maxprobeg', 20000),
-            'price': ('minprice', 'maxprice', 200000)
-        }
+        # Параметры двигателя (±20% от указанного объема)
+        if car_data.get('engine'):
+            engine = float(car_data['engine'])
+            delta = engine * 0.2  # 20% в обе стороны
+            params.update({
+                'mv': round(max(0.1, engine - delta), 1),
+                'xv': round(engine + delta, 1)
+            })
 
-        for param, (min_key, max_key, delta) in optional_params.items():
-            if param in car_data:
-                value = float(car_data[param])
-                params[min_key] = max(0, value - delta)
-                params[max_key] = value + delta
+        # Параметры мощности (±20% от указанной)
+        if car_data.get('power'):
+            power = int(car_data['power'])
 
-        # Добавляем специфичные параметры
-        if 'transmission' in car_data:
-            params['transmission'] = self.normalize_transmission(car_data['transmission'])
+            delta = power * 0.2  # 20% в обе стороны
+            params.update({
+                'minpower': int(max(10, power - delta)),
+                'maxpower': int(power + delta)
+            })
 
-        if 'drive_type' in car_data:
-            params['privod'] = self.normalize_drive_type(car_data['drive_type'])
+        # Параметры пробега (+50% от указанного)
+        if car_data.get('mileage'):
+            mileage = int(car_data['mileage'])
+            params.update({
+                'maxprobeg': int(mileage * 1.5)  # Ищем авто с пробегом до +50% от указанного
+            })
+
+        # Параметры цены (если нужно)
+        if car_data.get('price'):
+            price = float(car_data['price'])
+            params.update({
+                'minprice': int(price * 0.8),  # -20%
+                'maxprice': int(price * 1.2)  # +20%
+            })
 
         return urlencode(params)
 
@@ -200,43 +213,44 @@ class DromDetailedParser:
             logging.error(f"Ошибка парсинга заголовка: {str(e)}")
             return {}
 
-    def extract_listings_data(self, soup: BeautifulSoup) -> List[Dict]:
-        """Извлечение данных объявлений с расширенной информацией"""
+    def extract_listings_data(self, soup: BeautifulSoup) -> Optional[List[Dict]]:
+        """Извлечение данных объявлений с улучшенным логгированием"""
         try:
-            items = soup.select('a[data-ftid="bulls-list_bull"]')[:5]  # Берем больше объявлений
-            if not items:
-                return []
 
+            # Пытаемся найти JSON с данными
+            script_tags = soup.find_all('script', {'type': 'application/ld+json'})
             listings = []
-            for item in items:
+
+            for idx, script_tag in enumerate(script_tags[:5], 1):  # Ограничиваем 10 первыми скриптами
                 try:
-                    # Основные данные
-                    price = self.parse_price(item.select_one('[data-ftid="bull_price"]'))
-                    title = item.select_one('[data-ftid="bull_title"]').text.strip()
-                    url = item['href']
+                    # Парсинг JSON данных
+                    data = json.loads(script_tag.string)
 
-                    # Дополнительные данные
-                    description = self.parse_description(item)
-                    details = self.parse_details(item)
-                    location = self.parse_location(item)
+                    # Извлекаем нужные данные из каждого объекта
+                    if isinstance(data, dict):  # Проверяем, что это объект
+                        listing = {
+                            'price': data.get('offers', {}).get('price', 0),
+                            'title': data.get('name', ''),
+                            'url': data.get('url', ''),
+                            'year': data.get('vehicleModelDate', '').split('-')[0] if data.get(
+                                'vehicleModelDate') else '',
+                            'mileage': data.get('mileageFromOdometer', {}).get('value', 0),
+                            'engine': data.get('engineSpecification', {}).get('engineDisplacement', 0),
+                            'power': data.get('vehicleEngine', {}).get('horsepower', 0)
+                        }
 
-                    listings.append({
-                        'price': price,
-                        'title': title,
-                        'url': self.ensure_absolute_url(url),
-                        'description': description,
-                        'details': details,
-                        'location': location,
-                        'timestamp': datetime.now().isoformat()
-                    })
+                        listings.append(listing)
+                        logging.debug(f"Обработано объявление #{idx}: {listing}")
+
                 except Exception as e:
-                    logging.debug(f"Ошибка парсинга объявления: {str(e)}")
-                    continue
+                    logging.warning(f"Ошибка парсинга JSON объявления #{idx}: {str(e)}")
 
-            return listings
+            logging.info(f"Успешно извлечено {len(listings)} объявлений")
+            return listings if listings else None
+
         except Exception as e:
-            logging.error(f"Ошибка парсинга списка объявлений: {str(e)}")
-            return []
+            logging.error(f"Ошибка при извлечении объявлений: {str(e)}", exc_info=True)
+            return None
 
     # Дополнительные методы парсинга
     def parse_price(self, price_element) -> int:
@@ -258,15 +272,10 @@ class DromDetailedParser:
         info_elements = item.select('[data-ftid="bull_description-item"]')
 
         for element in info_elements:
-            text = element.text.strip()
-            if 'год' in text:
-                details['year'] = int(re.search(r'\d{4}', text).group())
-            elif 'км' in text:
-                details['mileage'] = int(re.sub(r'[^\d]', '', text))
-            elif 'л.с.' in text:
-                details['power'] = int(re.sub(r'[^\d]', '', text))
-            elif 'л' in text and 'л.с.' not in text:
-                details['engine'] = float(re.search(r'[\d\.]+', text).group())
+            label = element.select_one('.bull-description-label')
+            value = element.select_one('.bull-description-value')
+            if label and value:
+                details[label.text.strip()] = value.text.strip()
 
         return details
 
