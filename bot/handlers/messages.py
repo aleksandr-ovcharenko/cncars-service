@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from aiogram import Router, types
 
@@ -22,6 +23,46 @@ async def handle_car_info(message: types.Message):
         if not parsed_data:
             logging.warning("Не удалось распарсить данные авто")
             await message.answer("❌ Не удалось распознать данные авто")
+            return
+
+        # Список обязательных полей
+        required_fields = {
+            'brand': "марку автомобиля",
+            'model': "модель автомобиля",
+            'year': "год выпуска",
+            'engine': "объем двигателя",
+            'power': "мощность двигателя",
+            'price': "цену автомобиля",
+            'mileage': "пробег автомобиля"
+        }
+
+        # Проверяем наличие всех обязательных полей
+        missing_fields = [field_name for field, field_name in required_fields.items()
+                          if field not in parsed_data or parsed_data[field] is None]
+
+        if missing_fields:
+            error_message = "❌ Не хватает данных:\n"
+            error_message += "\n".join(f"• {field}" for field in missing_fields)
+            error_message += "\n\nПожалуйста, укажите все необходимые параметры."
+            example = "\n\nПример правильного формата:\nVolkswagen Tiguan\n2024 г.в.\n2.0 л\n200 л.с.\n50 000 км\n29 500 $"
+            await message.answer(error_message + example)
+            return
+
+        validations = {
+            'year': lambda x: 1900 < x < (datetime.now().year + 1),
+            'engine': lambda x: 0.5 < x < 10,
+            'power': lambda x: 50 < x < 1500,
+            'price': lambda x: x > 100,
+            'mileage': lambda x: x >= 0
+        }
+
+        invalid_fields = []
+        for field, validator in validations.items():
+            if field in parsed_data and not validator(parsed_data[field]):
+                invalid_fields.append(field)
+
+        if invalid_fields:
+            await message.answer(f"❌ Некорректные значения для: {', '.join(invalid_fields)}")
             return
 
         logging.info(f"Парсинг успешен: {parsed_data}")

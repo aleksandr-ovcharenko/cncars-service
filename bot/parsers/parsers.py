@@ -253,11 +253,12 @@ def parse_car_info(text: str) -> Optional[Dict[str, float]]:
             result['price'] = int(price_match.group(1).replace(' ', ''))
 
         # Парсинг пробега
-        mileage_pattern = r'(\d+)\s*(?:км|тыс|к\.м\.|километр)'
+        mileage_pattern = r'(\d[\d\s,]*)\s*(?:км|тыс|к\.м\.|километр)'
         mileage_match = re.search(mileage_pattern, normalized_text)
         log_parse_attempt("пробега", mileage_pattern, normalized_text, bool(mileage_match), mileage_match)
         if mileage_match:
-            mileage = int(mileage_match.group(1))
+            mileage_cleaned = mileage_match.group(1).replace(" ", "").replace(",", "")
+            mileage = int(mileage_cleaned)
             match_text = normalized_text[mileage_match.start():mileage_match.end() + 5]
             if 'тыс' in match_text:
                 mileage *= 1000
