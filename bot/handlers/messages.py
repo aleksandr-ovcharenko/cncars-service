@@ -117,6 +117,7 @@ async def handle_car_info(message: types.Message):
         else:
             response.append("\n⚠️ Не удалось рассчитать таможню")
 
+        # Получение рыночных цен
         market_data = {}
         try:
             async with PriceService() as price_service:
@@ -125,18 +126,26 @@ async def handle_car_info(message: types.Message):
                     model=parsed_data.get('model', ''),
                     year=parsed_data['year']
                 )
-            # Формируем сообщение с данными
-            response += [
-                f"🏷 <b>Цены на Drom.ru:</b>",
-                f"Минимальная цена: {market_data.get('price_min', 'N/A')} ₽",
-                f"Максимальная цена: {market_data.get('price_max', 'N/A')} ₽",
-                f"Страница поиска: <a href='{market_data.get('url', '')}'>Перейти на страницу</a>",
-                f"Заголовок страницы: {market_data.get('page_title', 'N/A')}"
-            ]
+            logging.info(f"Результаты парсинга цен: {market_data}")
 
-            if isinstance(market_data, str):  # Добавляем проверку, что market_data — это словарь
-                logging.error("Ожидался словарь, но получена строка.")
-                market_data = {}
+            if market_data and isinstance(market_data, dict):
+                # Получаем цены напрямую из корня market_data, а не из price_stats
+                price_min = market_data.get('price_min')
+                price_max = market_data.get('price_max')
+
+                # Форматируем цены с разделителями тысяч
+                formatted_min = f"{price_min:,} ₽".replace(',', ' ') if price_min else 'N/A'
+                formatted_max = f"{price_max:,} ₽".replace(',', ' ') if price_max else 'N/A'
+
+                response.extend([
+                    f"\n🏷 <b>Рыночные цены:</b>",
+                    f"• Минимальная: {formatted_min}",
+                    f"• Максимальная: {formatted_max}",
+                    f"• Объявлений: {market_data.get('ads_count', 0)}",
+                    f"• <a href='{market_data.get('url', '')}'>Ссылка на поиск</a>",
+                    f"• Заголовок: {market_data.get('page_title', 'N/A')}"
+                ])
+
         except Exception as e:
             logging.error(f"Ошибка при получении рыночных цен: {str(e)}", exc_info=True)
 
