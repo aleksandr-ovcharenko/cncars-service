@@ -1,8 +1,7 @@
 from aiogram import Router, types, F
-from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 router = Router()
+
 
 # Обработчик кнопки "Новый расчет"
 @router.callback_query(F.data == "new_calc")
@@ -13,6 +12,7 @@ async def handle_new_calc(callback: types.CallbackQuery):
         parse_mode="HTML"
     )
     await callback.answer()
+
 
 # Обработчик кнопки "Пример"
 @router.callback_query(F.data == "show_example")

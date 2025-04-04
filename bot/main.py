@@ -4,6 +4,9 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from bot.handlers import commands, messages
+from utils.logger import setup_logging
+
+setup_logging()
 
 
 async def main():

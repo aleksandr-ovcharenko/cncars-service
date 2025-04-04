@@ -1,6 +1,6 @@
 def calculate_customs(price_usd: float, engine: float, power: float, year: float) -> dict:
     euro_rate = 95  # Курс € к ₽ (актуальный)
-    usd_rate = 90   # Курс $ к ₽
+    usd_rate = 90  # Курс $ к ₽
     price_rub = price_usd * usd_rate
 
     # 1. Пошлина (15% для авто до 3 лет)
@@ -31,7 +31,24 @@ def calculate_customs(price_usd: float, engine: float, power: float, year: float
     # 5. Доп. расходы (ЭРА-ГЛОНАСС, сертификация и т. д.)
     additional_costs = 70_000 + 50_000 + 40_000 + 50_000  # Примерные значения
 
-    total = customs_duty + excise + vat + recycling_fee + additional_costs
+    # 6. Услуги китайской компании
+    china_service_fee = 700 * usd_rate  # Примерные значения
+
+    # 7. Транзитные документы Казахстана
+    transit_documents_kz = 500 * usd_rate  # Примерные значения
+
+    # 8. Транспортировка до Питера, потом до СВХ (1300 + 200)
+    transportation_fee = 1500 * usd_rate  # Примерные значения
+
+    # 9. Услуги брокера
+    brocker_service_fee = 2000 * usd_rate  # Примерные значения
+
+    # 9. Наша комиссия
+    our_service_fee = 1000 * usd_rate  # Примерные значения
+
+    services = china_service_fee + transit_documents_kz + transportation_fee + brocker_service_fee + our_service_fee
+
+    total = customs_duty + excise + vat + recycling_fee + additional_costs + services
 
     return {
         "price_rub": price_rub,
@@ -40,5 +57,6 @@ def calculate_customs(price_usd: float, engine: float, power: float, year: float
         "vat": vat,
         "recycling_fee": recycling_fee,
         "additional_costs": additional_costs,
+        "service_costs": services,
         "total": total
     }
