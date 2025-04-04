@@ -12,6 +12,7 @@ router = Router()
 # Настройка логгирования
 setup_logging()
 
+
 @router.message()
 async def handle_car_info(message: types.Message):
     try:
@@ -75,15 +76,30 @@ async def handle_car_info(message: types.Message):
         else:
             response.append("\n⚠️ Не удалось рассчитать таможню")
 
-        drom_prices = market_data.get('drom', [])
-        if drom_prices:
-            response.append("\n🏷 <b>Цены на Drom.ru:</b>")
-            for item in drom_prices[:3]:
-                response.append(f"• {item['price']:,} ₽: {item['url']}")
-        else:
-            response.append("\nℹ️ Не удалось получить актуальные рыночные цены")
+        market_data = {}
+        try:
+            async with PriceService() as price_service:
+                market_data = await price_service.get_market_prices(
+                    brand=parsed_data.get('brand', ''),
+                    model=parsed_data.get('model', ''),
+                    year=parsed_data['year']
+                )
+            # Формируем сообщение с данными
+            response += [
+                f"🏷 <b>Цены на Drom.ru:</b>",
+                f"Минимальная цена: {market_data.get('price_min', 'N/A')} ₽",
+                f"Максимальная цена: {market_data.get('price_max', 'N/A')} ₽",
+                f"Страница поиска: <a href='{market_data.get('url', '')}'>Перейти на страницу</a>",
+                f"Заголовок страницы: {market_data.get('page_title', 'N/A')}"
+            ]
 
-        await message.answer("\n".join(response), parse_mode="HTML")
+            if isinstance(market_data, str):  # Добавляем проверку, что market_data — это словарь
+                logging.error("Ожидался словарь, но получена строка.")
+                market_data = {}
+        except Exception as e:
+            logging.error(f"Ошибка при получении рыночных цен: {str(e)}", exc_info=True)
+
+        await message.answer("\n".join(response), parse_mode="HTML", disable_web_page_preview=True)
         logging.info("Сообщение успешно отправлено")
 
     except Exception as e:

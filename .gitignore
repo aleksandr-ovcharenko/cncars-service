@@ -4,3 +4,5 @@ __pycache__/
 .DS_Store
 venv/
 /bot/car_parser.log
+/car_parser.log
+/bot/last_debug_page.html

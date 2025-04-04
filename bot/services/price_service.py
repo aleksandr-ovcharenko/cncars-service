@@ -1,5 +1,3 @@
-from typing import List, Dict
-
 import aiohttp
 
 from bot.parsers.drom_parser import DromDetailedParser
@@ -7,13 +5,12 @@ from bot.parsers.drom_parser import DromDetailedParser
 
 class PriceService:
     async def __aenter__(self):
-        # Инициализация (если нужно, например подключение к API, сессия и т.д.)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        # Очистка ресурсов, если нужно (закрытие сессии и т.д.)
         pass
 
+    # Получаем данные с Drom
     async def get_market_prices(self, brand: str, model: str, year: int) -> dict:
         async with aiohttp.ClientSession() as session:
             drom_parser = DromDetailedParser(session)
@@ -22,6 +19,20 @@ class PriceService:
                 'model': model,
                 'year': year
             })
-            return {
-                'drom': drom_prices_raw.get('listings', []) if drom_prices_raw else []
-            }
+
+            # Подготовим данные для ответа
+            if drom_prices_raw:
+                result = {
+                    'drom': drom_prices_raw.get('listings', []),
+                    'price_min': drom_prices_raw.get('price_min', 'N/A'),
+                    'price_max': drom_prices_raw.get('price_max', 'N/A'),
+                    'ads_count': drom_prices_raw.get('ads_count', 'N/A'),
+                    'url': drom_prices_raw.get('url', ''),
+                    'page_title': drom_prices_raw.get('page_title', 'N/A')
+                }
+
+                # Возвращаем словарь, а не строку
+                return result
+
+            return {}  # Возвращаем пустой словарь, если данных нет
+
