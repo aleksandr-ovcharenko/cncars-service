@@ -143,7 +143,6 @@ async def handle_car_info(message: types.Message):
                     f"\n🏷 <b>Рыночные цены:</b>",
                     f"• Минимальная: {formatted_min}",
                     f"• Максимальная: {formatted_max}",
-                    f"• Объявлений: {market_data.get('ads_count', 0)}",
                     f"• <a href='{market_data.get('url', '')}'>Ссылка на поиск</a>",
                     f"• Заголовок: {market_data.get('page_title', 'N/A')}"
                 ])
@@ -151,18 +150,25 @@ async def handle_car_info(message: types.Message):
                 logging.info(f"Результаты парсинга цен: {market_data.get('listings')}")
 
                 if market_data.get('listings'):
+                    listings = market_data['listings']
+                    avg_price = (price_min + price_max) / 2
+                    formatted_avg = f"{avg_price:,.0f} ₽".replace(',', ' ')
                     response.append("\n🔍 <b>Последние объявления:</b>")
-                    for idx, item in enumerate(market_data['listings'][:5], 1):
-                        # Проверяем, есть ли все обязательные данные и не равны ли они нулю
+                    for idx, item in enumerate(listings[:5], 1):
                         price = item.get('price')
                         mileage = item.get('mileage')
                         year = item.get('year')
 
-                        if price and mileage and year:
-                            # Форматируем цену и пробег с разделителями тысяч
-                            formatted_price = f"{price:,}".replace(',', ' ') + " ₽"
+                        # Форматирование данных с проверкой
+                        formatted_price = f"{price:,} ₽".replace(',', ' ') if price else "Цена не указана"
+                        formatted_year = f"{year} г." if year else "Год не указан"
 
-                            response.append(f"   {formatted_price} | {year} г. | {mileage} км.")
+                        response.append(
+                            f"    {formatted_price} |  {formatted_year} |  {mileage} км."
+                        )
+
+                    response.append(calculate_profit_stats(avg_price, parsed_data['price'], result))
+
 
         except Exception as e:
             logging.error(f"Ошибка при получении рыночных цен: {str(e)}", exc_info=True)
@@ -172,3 +178,35 @@ async def handle_car_info(message: types.Message):
     except Exception as e:
         logging.critical(f"Непредвиденная ошибка: {str(e)}", exc_info=True)
         await message.answer("⚠️ Произошла непредвиденная ошибка. Попробуйте позже.")
+
+
+def calculate_profit_stats(avg_price: float, original_price_usd: float, customs_result: dict) -> str:
+    try:
+        # Получаем среднюю цену с drom
+        if not avg_price:
+            return "⚠️ Невозможно вычислить статистику: средняя цена не найдена."
+
+        # Переводим цену авто в рубли (предполагаем курс 1 USD = 90 RUB)
+        price_rub = original_price_usd * 90
+
+        # Общая стоимость после растаможки
+        customs_total = customs_result.get('total', 0)
+        full_cost = price_rub + customs_total
+
+        # Вычисляем разницу
+        delta = avg_price - full_cost
+
+        # Форматируем вывод
+        result = [
+            "\n📊 <b>Сравнение с рынком:</b>",
+            f"• Средняя рыночная цена: {avg_price:,.0f} ₽",
+            f"• Цена авто + растаможка: {full_cost:,.0f} ₽",
+            f"• Разница: {'+' if delta > 0 else ''}{delta:,.0f} ₽"
+        ]
+
+        return "\n".join(result).replace(',', ' ')
+
+    except Exception as e:
+        import logging
+        logging.error(f"Ошибка в calculate_profit_stats: {e}", exc_info=True)
+        return "⚠️ Ошибка при вычислении статистики."
